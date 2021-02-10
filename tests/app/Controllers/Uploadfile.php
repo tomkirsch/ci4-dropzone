@@ -5,7 +5,8 @@ class Uploadfile extends BaseController{
 		$dropzone = service('dropzone');
 		$movedFile = $dropzone->readChunk('userfile');
 		return $this->response->setJSON([
-			'chunk'=>$movedFile,
+			'id'=>$dropzone->getId(),
+			'chunkIndex'=>$dropzone->getChunkIndex(),
 		]);
 	}
 	
@@ -13,17 +14,32 @@ class Uploadfile extends BaseController{
 		$dropzone = service('dropzone');
 		$path = 'uploads';
 		if(!is_dir($path)) mkdir($path);
-		$file = $this->request->getPost('filename');
-		$filePath = $path.'/'.$file;
+		$clientName = $this->request->getPost('clientName');
+		if(!$clientName) throw new \Exception('clientName was not passed in POST');
+		$filePath = $path.'/'.$clientName;
 		if(file_exists($filePath)) unlink($filePath);
-		$dropzone->assemble($filePath);
-		return $this->response->setJSON([
-			'file'=>$filePath,
-		]);
+		$assembledFile = $dropzone->assemble($filePath);
+		
+		$json = [
+			'id'=>$dropzone->getId(),
+			'filePath'=>$filePath,
+			'clientName'=>$clientName,
+			'isImage'=>$dropzone->isImage(),
+		];
+		// if we got an image, return its width/height etc.
+		if($dropzone->isImage()){
+			$json = array_merge($assembledFile->getProperties(TRUE), $json);
+		}
+		
+		return $this->response->setJSON($json);
 	}
 	
-	public function clean(){
+	public function delete(){
 		$dropzone = service('dropzone');
-		
+		$numDeleted = $dropzone->delete();
+		return $this->response->setJSON([
+			'id'=>$dropzone->getId(),
+			'numDeleted'=>$numDeleted,
+		]);
 	}
 }

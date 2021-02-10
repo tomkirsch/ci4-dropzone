@@ -5,11 +5,11 @@
 	<title>Dropzone Test</title>
 	<meta name="viewport" content="width=device-width, initial-scale=1.0">
 	<link rel="shortcut icon" type="image/png" href="/favicon.ico"/>
+	<link rel="stylesheet" type="text/css" href="js/dropzone/basic.min.css">
+	<link rel="stylesheet" type="text/css" href="js/dropzone/dropzone.min.css">
 </head>
-<body>
-	<form method="post" enctype="multipart/form-data">
-		<input type="file" name="userfile" class="js-dropzone">
-	</form>
+<body>	
+	<div class="js-dropzone"></div>
 	<div class="d-flex js-uploads"></div>
 	<script src="js/main.js"></script>
 </body>

@@ -1,30 +1,85 @@
 <?php namespace Tomkirsch\Dropzone;
 
 use CodeIgniter\Files\File;
+use CodeIgniter\Images\Image;
+use CodeIgniter\HTTP\Files\UploadedFile;
+use CodeIgniter\Images\Exceptions\ImageException;
 
 class Dropzone{
+	// config properties, or change via setters
 	protected $chunkPath;
 	protected $partFileExt;
-	protected $request;
+	protected $chunkMaxAge;
 	
+	// these are read in POST
 	protected $dzuuid;
 	protected $chunkIndex;
 	protected $chunkTotal;
 	protected $fileSizeTotal;
-	protected $chunk;
-	
 	protected $clientName;
+	
+	// other properties
+	protected $chunk;
+	protected $assembledFile;
+	protected $request;
 	
 	public function __construct($config=NULL){
 		$pathConfig = config('paths');
 		$this->chunkPath		= $config->chunkPath ?? $pathConfig->chunkPath ?? $pathConfig->writableDirectory ?? '';
 		$this->partFileExt		= $config->partFileExt ?? '.part';
+		$this->chunkMaxAge		= $config->chunkMaxAge ?? 60 * 60 * 4; // clean chunks older than 4 hours
 		$this->request = service('request');
 	}
 	
+	public function getChunkPath():string{
+		return $this->chunkPath;
+	}
+	public function setChunkPath(string $path){
+		return $this->chunkPath = $path;
+	}
+	public function getPartFileExt():string{
+		return $this->partFileExt;
+	}
+	public function setPartFileExt(string $ext){
+		return $this->partFileExt = $ext;
+	}
+	public function getChunkMaxAge():int{
+		return $this->chunkMaxAge;
+	}
+	public function setChunkMaxAge(int $age){
+		return $this->chunkMaxAge = $age;
+	}
+	
+	// getters
+	public function getId():?string{
+		return $this->dzuuid;
+	}
+	public function getChunkIndex():?int{
+		return $this->chunkIndex;
+	}
+	public function getChunkTotal():?int{
+		return $this->chunkTotal;
+	}
+	public function getFileSizeTotal():?int{
+		return $this->fileSizeTotal;
+	}
+	public function getChunk():?File{
+		return $this->chunk;
+	}
+	public function getAssembledFile():?File{
+		return $this->assembledFile;
+	}
+	public function isImage():bool{
+		return is_a($this->assembledFile, 'CodeIgniter\Images\Image');
+	}
+	// NOTE: clientName will ONLY be sent with the chunk. If you need it to assemble the final file, you should send it from JS when calling assemble ajax
+	public function getClientName():?File{
+		return $this->clientName;
+	}
+	
 	// read dropzone data and chunk from POST. Returns the uploaded file that has moved
-	public function readChunk(string $fileInputName):string{
-		$this->readPost();
+	public function readChunk(string $fileInputName, array $postData=[]):UploadedFile{
+		$this->readPost($postData);
 		
 		$this->chunkIndex = $this->request->getPost('dzchunkindex');
 		if($this->chunkIndex === NULL) throw new \Exception('dzchunkindex was not sent in POST');
@@ -32,18 +87,21 @@ class Dropzone{
 		// get the chunk and check it
 		$this->chunk = $this->request->getFile($fileInputName); // CodeIgniter\HTTP\Files\UploadedFile
 		if(!$this->chunk->isValid()) throw new \Exception($this->chunk->getErrorString().'('.$this->chunk->getError().')');
+		
+		// read original file name
 		$this->clientName = $this->chunk->getClientName();
 		
 		// move it
 		$fileName = $this->makeChunkFileName($this->chunkIndex);
 		$this->chunk->move($this->chunkPath, $fileName, TRUE);
 		
-		return $this->chunkPath.'/'.$this->chunk->getName();
+		return $this->chunk;
 	}
 	
-	// assemble chunks. Make sure your JS passes the correct POST data
-	public function assemble($destFile):string{
-		$this->readPost();
+	// assemble chunks - returns either an Image, or File
+	public function assemble(string $destFile, bool $detectImage=TRUE, array $postData=[]):File{
+		$this->readPost($postData);
+		
 		$chunks = [];
 		$fileSize = 0;
 		for($i=0; $i<$this->chunkTotal; $i++){
@@ -70,16 +128,34 @@ class Dropzone{
 		}
 		fclose($out);
 		
-		return $destFile;
+		// image detection
+		if($detectImage){
+			$assembledFile = new Image($destFile, TRUE);
+			try{
+				$assembledFile->getProperties(FALSE);
+			}catch(ImageException $err){
+				// not an image
+				$assembledFile = new File($destFile, TRUE);
+			}
+		}else{
+			$assembledFile = new File($destFile, TRUE);
+		}
+		$this->assembledFile = $assembledFile;
+		return $assembledFile;
 	}
 	
-	public function delete($dzuuid){
-		$this->readPost();
+	public function delete(array $postData=[]):int{
+		$numDeleted = 0;
+		$this->readPost($postData);
 		for($i=0; $i<$this->chunkTotal; $i++){
 			$chunkName = $this->makeChunkFileName($i);
 			$chunkFile = $this->chunkPath.'/'.$chunkName;
-			if(file_exists($chunkFile)) unlink($chunkFile);
+			if(file_exists($chunkFile)){
+				unlink($chunkFile);
+				$numDeleted++;
+			}
 		}
+		return $numDeleted;
 	}
 	
 	// cleanup old or canceled chunks
@@ -96,7 +172,7 @@ class Dropzone{
 				if(substr($file, strlen($this->partFileExt) * -1) !== $this->partFileExt) continue;
 				// check modified time, to prevent current chunks from being removed
 				$time = filemtime($this->chunkPath.'/'.$file);
-				if($time && time() - $time > 60 * 60 * 4){ // 4hr
+				if($time && time() - $time > $this->chunkMaxAge){ // 4hr
 					unlink($this->chunkPath.'/'.$file);
 				}
 			}
@@ -109,21 +185,20 @@ class Dropzone{
 		JS with Dropzone file:
 		$.ajax({
 			data: {
-				filename: file.name,
-				dzuuid: file.upload.uuid,
-				dztotalfilesize: file.size,
-				dztotalchunkcount: file.upload.totalChunkCount,
+				dzuuid: 			file.upload.uuid,
+				dztotalfilesize: 	file.size,
+				dztotalchunkcount: 	file.upload.totalChunkCount,
 			},
 		});
 	*/
-	protected function readPost(){
-		$this->dzuuid = $this->request->getPost('dzuuid');
+	protected function readPost(array $data=[]){
+		$this->dzuuid = $data['dzuuid'] ?? $this->request->getPost('dzuuid');
 		if($this->dzuuid === NULL) throw new \Exception('dzuuid was not sent in POST');
 		
-		$this->chunkTotal = $this->request->getPost('dztotalchunkcount');
+		$this->chunkTotal = $data['dztotalchunkcount'] ?? $this->request->getPost('dztotalchunkcount');
 		if($this->chunkTotal === NULL) throw new \Exception('dztotalchunkcount was not sent in POST');
 		
-		$this->fileSizeTotal = $this->request->getPost('dztotalfilesize');
+		$this->fileSizeTotal = $data['dztotalfilesize'] ?? $this->request->getPost('dztotalfilesize');
 		if($this->fileSizeTotal === NULL) throw new \Exception('dztotalfilesize was not sent in POST');
 		
 		$this->chunkIndex = intval($this->chunkIndex);
