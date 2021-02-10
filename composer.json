@@ -11,5 +11,8 @@
         "psr-4": {
             "Tomkirsch\\Dropzone\\": "src/"
         }
-	}
+	},
+	"archive": {
+        "exclude": ["tests"]
+     }
 }

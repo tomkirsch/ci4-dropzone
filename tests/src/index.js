@@ -1,46 +1,3 @@
-Config/Services.php
-```
-	public static function dropzone(App $config = null, bool $getShared=TRUE){
-		$config = $config ?? config('App');
-		return $getShared ? static::getSharedInstance('dropzone', $config) : new \Tomkirsch\Dropzone\Dropzone($config);
-	}
-```
-
-Your Controller:
-```
-<?php namespace App\Controllers;
-
-class Uploadfile extends BaseController{
-	public function chunk(){
-		$dropzone = service('dropzone');
-		$movedFile = $dropzone->readChunk('userfile');
-		return $this->response->setJSON([
-			'chunk'=>$movedFile,
-		]);
-	}
-	
-	public function assemble(){
-		$dropzone = service('dropzone');
-		$path = 'uploads';
-		if(!is_dir($path)) mkdir($path);
-		$file = $this->request->getPost('filename');
-		$filePath = $path.'/'.$file;
-		if(file_exists($filePath)) unlink($filePath);
-		$dropzone->assemble($filePath);
-		return $this->response->setJSON([
-			'file'=>$filePath,
-		]);
-	}
-	
-	public function clean(){
-		$dropzone = service('dropzone');
-		
-	}
-}
-```
-
-Javascript:
-```
 import 'jquery';
 import 'dropzone';
 
@@ -71,7 +28,7 @@ let dzOptions = {
 			},
 			success: (data) => { 
 				done(); // must call done function
-				$('.js-uploads').prepend(`<img style="max-width:200px;" src="${data.file}" alt="">`);
+				$('.js-uploads').prepend(`<img style="max-width:500px;" src="${data.file}" alt="">`);
 			},
 			error: (msg) => {
 				file.accepted = false;
@@ -104,4 +61,3 @@ dropzone.on('error', (file, errorMessage) => {
 		},
 	});
 });
-```
