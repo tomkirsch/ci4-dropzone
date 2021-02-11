@@ -207,6 +207,10 @@ class Dropzone{
 	}
 	
 	protected function makeChunkFileName(int $index):string{
-		return $this->dzuuid.'.'.$index.$this->partFileExt; // UUID.0.part
+		// we need the part- prefix, in case the uuid starts with a number or weird character
+		$file = 'part-'.$this->dzuuid.'-'.$index.$this->partFileExt; // part-UUID-0.part
+		$file = preg_replace("([^\w\s\d\-_~,;\[\]\(\).])", '', $file); // Remove anything which isn't a word, whitespace, number, or any of the following caracters -_~,;[]().
+		$file = preg_replace("([\.]{2,})", '', $file); // // Remove any runs of periods
+		return $file;
 	}
 }
