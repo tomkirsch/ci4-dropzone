@@ -25,7 +25,15 @@ class Dropzone{
 	
 	public function __construct($config=NULL){
 		$pathConfig = config('paths');
-		$this->chunkPath		= $config->chunkPath ?? $pathConfig->chunkPath ?? $pathConfig->writableDirectory ?? '';
+		$this->chunkPath		= $config->chunkPath ?? $pathConfig->chunkPath;
+		if(!$this->chunkPath){
+			// no explicit chunk path found. use writable dir
+			$this->chunkPath = $pathConfig->writableDirectory;
+			// CI comes with an uploads dir... use that if possible
+			if(is_dir($this->chunkPath.'/uploads')){
+				$this->chunkPath .= '/uploads';
+			}
+		}
 		$this->partFileExt		= $config->partFileExt ?? '.part';
 		$this->chunkMaxAge		= $config->chunkMaxAge ?? 60 * 60 * 4; // clean chunks older than 4 hours
 		$this->request = service('request');
