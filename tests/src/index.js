@@ -92,7 +92,6 @@ export let dzFactory = function(target, myOptions){
 	return dropzone;
 };
 
-Dropzone.autoDiscover = false; // so we can add the CSS class without auto-instantiation
 let dropzone = dzFactory($('.js-dropzone').addClass('dropzone').get(0), {
 	assemblyDone: (data, file) => {
 		let $el = $(`<a href="${data.filePath}" />`);
