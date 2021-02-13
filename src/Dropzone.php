@@ -25,7 +25,7 @@ class Dropzone{
 	
 	public function __construct($config=NULL){
 		$pathConfig = config('paths');
-		$this->chunkPath		= $config->chunkPath ?? $pathConfig->chunkPath;
+		$this->chunkPath = $config->chunkPath ?? $pathConfig->chunkPath ?? NULL;
 		if(!$this->chunkPath){
 			// no explicit chunk path found. use writable dir
 			$this->chunkPath = $pathConfig->writableDirectory;
