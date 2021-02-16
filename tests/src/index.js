@@ -24,16 +24,15 @@ export let dzFactory = function(target, myOptions){
 		acceptedFiles: null,
 	};
 	let options = {};
-	Object.assign(options, defaults);
-	Object.assign(options, myOptions);
+	options = Object.assign(options, defaults);
+	options = Object.assign(options, myOptions);
 	
 	let deleteChunks = (file) => {
 		let chunkCount = 1;
 		if(file.upload.totalChunkCount != undefined){
 			chunkCount = file.upload.totalChunkCount;
 		}
-		let postData = options.postData;
-		Object.assign(options, {
+		const postData = Object.assign(options.postData, {
 			clientName: file.name,
 			dzuuid: file.upload.uuid,
 			dztotalfilesize: file.size,
@@ -46,15 +45,20 @@ export let dzFactory = function(target, myOptions){
 		});
 	};
 	options.sending = (file, xhr, formData) => {
-		for(const prop in options.postData) {
-			formData.append(prop, options.postData[prop]);
+		const postData = Object.assign(options.postData, {
+			clientName: file.name,
+			dzuuid: file.upload.uuid,
+			dztotalfilesize: file.size,
+			dztotalchunkcount: file.upload.totalChunkCount,
+		});
+		for(const prop in postData) {
+			formData.append(prop, postData[prop]);
 		}
 	};
 	options.chunksUploaded = (file, done) => {
 		// we must save the total chunk count for error callback
 		let chunkCount = file.upload.totalChunkCount;
-		let postData = options.postData;
-		Object.assign(postData, {
+		const postData = Object.assign(options.postData, {
 			clientName: file.name,
 			dzuuid: file.upload.uuid,
 			dztotalfilesize: file.size,
